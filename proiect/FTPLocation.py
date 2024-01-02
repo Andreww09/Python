@@ -1,8 +1,8 @@
 import os
+import shutil
 from datetime import datetime
 from ftplib import FTP
-import ftplib
-import shutil
+
 import ftputil
 
 from Location import Location
@@ -13,13 +13,13 @@ class FTPLocation(Location):
     Class representing an FTP location with additional functionality for file operations.
     """
 
-    def __init__(self, address, id):
+    def __init__(self, address, n):
         """
         Initializes an FTPLocation object.
 
         Parameters:
         - address (str): FTP address in the format "user:password@host:port/path".
-        - id (int): an identifier for the temporary intermediate location
+        - n (int): an identifier for the temporary intermediate location
         """
         try:
             # get the components from the ftp address
@@ -29,7 +29,7 @@ class FTPLocation(Location):
 
             # path to the temporary location
             current_directory = os.getcwd()
-            full_path = os.path.join(current_directory, f"temp{id}")
+            full_path = os.path.join(current_directory, f"temp{n}")
 
             self.local_path = full_path
             # deletes the temporary location if already exists and recreate the folder
@@ -98,13 +98,23 @@ class FTPLocation(Location):
         Returns:
         - datetime: A datetime object representing the last modification time of the specified file.
         """
-        ftp = self.connect()
-        # time = ftp.sendcmd(f"MDTM {self.path}")
-        # modify_date = datetime.strptime(time[4:], "%Y%m%d%H%M%S.%f")
-        stat_result = ftp.stat(self.path + "/" + file)
-        modify_time = stat_result.st_mtime
-        modify_date = datetime.fromtimestamp(modify_time)
-        ftp.close()
+
+        ftp = FTP()
+
+        ftp.connect(self.host, int(self.port))
+        ftp.login(self.user, self.password)
+        time = ftp.sendcmd(f"MDTM {self.path + '/' + file}")
+        # first 4 digits in time represent a status code
+        server_time = datetime.strptime(time[4:], "%Y%m%d%H%M%S.%f")
+
+        # corrects the server time so that it matches the local zone
+        local_time = datetime.now()
+        utc_time = datetime.utcnow()
+        server_timezone_offset = local_time - utc_time
+
+        modify_date = server_time + server_timezone_offset
+
+        ftp.quit()
         return modify_date
 
     def get_list_of_files(self, location=""):
@@ -130,7 +140,11 @@ class FTPLocation(Location):
     def delete_file(self, file):
         ftp = self.connect()
         try:
-            ftp.remove(self.path + '/' + file)
+            print("To be deleted", self.path + '/' + file)
+            if self.is_dir(file):
+                ftp.rmtree(self.path + '/' + file)
+            else:
+                ftp.remove(self.path + '/' + file)
         except Exception as e:
             print(e)
         ftp.close()
@@ -172,4 +186,3 @@ class FTPLocation(Location):
                 print(f"Directory '{self.local_path}' not found.")
             except PermissionError:
                 print(f"Permission error while trying to delete directory '{self.local_path}'.")
-

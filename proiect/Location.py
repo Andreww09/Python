@@ -23,7 +23,7 @@ class Location:
         """
         Checks if a file is a directory
         """
-        return os.path.isdir(self.path + "/" + file)
+        return os.path.isdir(self.path + file)
 
     def create_dir(self, file):
         """
@@ -39,10 +39,13 @@ class Location:
 
     def delete_file(self, file):
         """
-        Deletes the given file
+        Deletes the given file or directory including its contents
         """
         try:
-            os.remove(self.path + "/" + file)
+            if self.is_dir(file):
+                shutil.rmtree(self.path + file)
+            else:
+                os.remove(self.path + file)
         except FileNotFoundError:
             print(f"File '{file}' not found.")
         except PermissionError:
