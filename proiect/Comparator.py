@@ -1,6 +1,7 @@
 import datetime
 import hashlib
 from datetime import datetime
+from ftplib import error_perm
 
 from FTPLocation import FTPLocation
 from Location import Location
@@ -26,7 +27,30 @@ class Comparator:
         # stores the time of the last checking
         self.last_timestamp = None
 
+    def run(self, init):
+        """
+        Starting point for comparing two locations
+        Parameters:
+            - init (bool): whether this is the first call or not
+
+        """
+        done = False
+        # retrying to compare if the files have been deleted during synchronization
+        while done is False:
+            try:
+                self.compare(init)
+                done = True
+            except error_perm as e:
+                print(f"FTP Permission Error: {e}\nThe file might have changed during synchronization. Retrying...")
+            except FileNotFoundError as e:
+                print(f"File Not Found Error: {e}\nThe file might have changed during synchronization. Retrying...")
+
     def compare(self, init):
+        """
+        Prepares the necessary before comparing two locations
+        Parameters:
+            - init (bool): whether this is the first call or not
+        """
         self.last_timestamp = datetime.now()
         file1 = get_file(self.type1, self.loc1, 1)
         file2 = get_file(self.type2, self.loc2, 2)
@@ -58,13 +82,12 @@ class Comparator:
         """
         files1 = loc1.get_list_of_files(parent)
         files2 = loc2.get_list_of_files(parent)
-        print(files1,files2)
+        print("Found files:\n", files1, files2)
         for file in files1:
             # full path to the content root
             file_path = parent + "/" + file
             last_added1.append(file_path)
             if file not in files2:
-
                 # if a file hasn't been modified since last checking, but it's missing from one location then
                 # it has been deleted
                 if init is True and file_path in self.last_files2:
@@ -77,6 +100,8 @@ class Comparator:
                         self.compare_locations(init, loc1, loc2, last_added1, last_added2, file_path)
                     else:
                         loc2.copy_file(loc1.get_file_path(file_path), file_path)
+                        # add the new file in the future list of files for the second location
+                        last_added2.append(file_path)
 
             else:
                 # if both directories are present then check the contents
@@ -107,6 +132,8 @@ class Comparator:
                         self.compare_locations(init, loc1, loc2, last_added1, last_added2, file_path)
                     else:
                         loc1.copy_file(loc2.get_file_path(file_path), file_path)
+                        # add the new file in the future list of files for the first location
+                        last_added1.append(file_path)
 
 
 # used in comparing 2 files
