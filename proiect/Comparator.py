@@ -96,6 +96,7 @@ class Comparator:
                     # if a new file is found in one location, it is copied to the other
                     if loc1.is_dir(file_path):
                         loc2.create_dir(file_path)
+                        last_added2.append(file_path)
                         # compare the contents of directories
                         self.compare_locations(init, loc1, loc2, last_added1, last_added2, file_path)
                     else:
@@ -129,6 +130,7 @@ class Comparator:
                 else:
                     if loc2.is_dir(file_path):
                         loc1.create_dir(file_path)
+                        last_added1.append(file_path)
                         self.compare_locations(init, loc1, loc2, last_added1, last_added2, file_path)
                     else:
                         loc1.copy_file(loc2.get_file_path(file_path), file_path)
